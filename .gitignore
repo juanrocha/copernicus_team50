@@ -14,3 +14,4 @@
 *.nc
 .Rapp.history
 *.csv
+data/*

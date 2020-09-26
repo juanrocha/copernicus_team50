@@ -125,7 +125,7 @@ read_files <- function(x,y){
   # x is the file
   # y is the ids
   obs <- read_delim(
-    file = paste("~/Downloads/smhi_data", files[4], sep = "/"),
+    file = paste("~/Downloads/smhi_data", files[i], sep = "/"),
     delim = ";",
     skip = 9,
     col_types = cols(
@@ -137,8 +137,6 @@ read_files <- function(x,y){
       `Tidsutsnitt:` = col_character()
     )
   )
-
-
 
   obs <- obs %>%
     select(1:4) %>%
