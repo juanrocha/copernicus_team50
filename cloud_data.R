@@ -6,7 +6,7 @@ library(tictoc)
 
 ## Cloud data:
 dat <- read_csv2(
-  "~/Downloads/metobs_totalCloudCover_all_sites.csv",
+  "data/metobs_totalCloudCover_all_sites.csv",
   col_types = cols(
     Id = col_double(), Name = col_character(), Latitude = col_character(),
   Longitude = col_character(), Height = col_double(), Active = col_character()))
@@ -24,7 +24,6 @@ dat <- dat %>%
   filter(Active == "Yes" | Active == "Ja") %>%
   select(id = Id, name = Name, lon = Longitude, lat = Latitude)
 
-dat$lat
 
 # copied from the Jupyter notebook: dates when pictures were taken
 times <- tibble(
@@ -116,8 +115,12 @@ times <- times %>%
 
 
 ## Files downloaded frm SMHI (https://www.smhi.se/data/meteorologi/ladda-ner-meteorologiska-observationer#param=totalCloudCover,stations=all,stationid=124300)
-files <- list.files("~/Downloads/smhi_data")
+##
+path <- "data/smhi_cloud_data"
+files <- list.files(path = path)
 ids <- files %>% str_split("_") %>% map(function(x) x[3]) %>% unlist()
+
+
 out <- list()
 
 
@@ -125,7 +128,7 @@ read_files <- function(x,y){
   # x is the file
   # y is the ids
   obs <- read_delim(
-    file = paste("~/Downloads/smhi_data", files[i], sep = "/"),
+    file = paste(path, x, sep = "/"),
     delim = ";",
     skip = 9,
     col_types = cols(
@@ -137,6 +140,38 @@ read_files <- function(x,y){
       `Tidsutsnitt:` = col_character()
     )
   )
+  ## Some files have more than 10 rows to skip, here I do two extra checks as max
+  ## to correct.
+  if(names(obs)[1] != "Datum") {
+    obs <- read_delim(
+      file = paste(path, x, sep = "/"),
+      delim = ";",
+      skip = 10,
+      col_types = cols(
+        Datum = col_date(format = ""),
+        `Tid (UTC)` = col_time(format = ""),
+        `Total molnmängd` = col_double(),
+        Kvalitet = col_character(),
+        X5 = col_logical(),
+        `Tidsutsnitt:` = col_character()
+      )
+    )
+  }
+  if(names(obs)[1] != "Datum") {
+    obs <- read_delim(
+      file = paste(path, x, sep = "/"),
+      delim = ";",
+      skip = 11,
+      col_types = cols(
+        Datum = col_date(format = ""),
+        `Tid (UTC)` = col_time(format = ""),
+        `Total molnmängd` = col_double(),
+        Kvalitet = col_character(),
+        X5 = col_logical(),
+        `Tidsutsnitt:` = col_character()
+      )
+    )
+  }
 
   obs <- obs %>%
     select(1:4) %>%
@@ -162,7 +197,7 @@ read_safe <- safely(read_files)
 
 tic()
 out <- map2(files, ids, read_safe)
-toc() # 135 files, 90 secs
+toc() # 135 files, 30 secs
 
 ## Detect files with errors: errors are common when the number of rows to skip is > 9
 error <- map(out, function(x) !is.null(x$error)) %>% unlist()
@@ -175,9 +210,11 @@ is_ok <- map(out, function(x) dim(x$result)[1] > 0) %>% unlist()
 out <- transpose(out)
 
 out <- out$result[is_ok] %>%
-  bind_rows()
+  bind_rows() %>%
+  mutate(id = as.numeric(id)) %>%
+  left_join(dat)
 
-write_csv(out, "~/Desktop/annotated_clouds.csv")
+write_csv(out, "annotated_clouds.csv")
 
 skimr::skim(out)
 out %>% pull(quality) %>% unique()
